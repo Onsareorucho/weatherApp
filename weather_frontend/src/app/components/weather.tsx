@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Search, MapPin, AlertCircle, ThermometerSun, Sun, Moon, Mail, Phone, Share2 } from 'lucide-react';
+import React, { useState, useEffect, JSX } from 'react';
+import { Search, MapPin, AlertCircle, ThermometerSun, Sun, Moon, Mail, Phone, Share2,Cloudy,CloudDrizzle } from 'lucide-react';
+import axios from 'axios';
+
 
 const WeatherApp = () => {
   const [searchCity, setSearchCity] = useState('');
@@ -14,63 +16,83 @@ const WeatherApp = () => {
   const [contactMethod, setContactMethod] = useState('email');
   const [contactValue, setContactValue] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
+  
+  const [citiesLoaded, setCitiesLoaded] = useState(false);
+  const [fetchedData, setFetchedData] = useState([]);
 
-  // Define staticCities inside the component
-  const staticCities = [
-    { name: 'London', temp: 18, humidity: 75, windSpeed: 12, condition: 'Cloudy' },
-    { name: 'New York', temp: 22, humidity: 65, windSpeed: 8, condition: 'Sunny' },
-    { name: 'Tokyo', temp: 25, humidity: 70, windSpeed: 10, condition: 'Clear' },
+  const url = 'http://api.openweathermap.org/data/2.5/weather?q=Nairobi&units=imperial&appid=f6683328b3cd5829e9560bd91753a2b5';
+  const conditionIcon = [
+    {name:"sun", icon: <Sun className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> },
+    {name:"clear", icon: <Sun className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> },
+    {name:"rain", icon: <CloudDrizzle className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> },
+    {name:"shower", icon: <CloudDrizzle className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> },
+    {name:"cloud", icon: <Cloudy className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> }
   ];
 
   useEffect(() => {
     const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDarkMode(darkModePreference);
+   
   }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
 
-  useEffect(() => {
-    fetchWeatherData();
-  }, []);
-
-  const fetchWeatherData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('http://127.0.0.1:8000/');
-      const data = await response.json();
-      setWeatherData(data);
-    } catch (err) {
-      setError('Failed to fetch weather data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleShareReport = async (e) => {
     e.preventDefault();
     setShareLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      alert(`Weather report sent to ${contactValue} via ${contactMethod}`);
+      const payload = constructRequestPayload(contactMethod, weatherData, contactValue);
+      console.log(weatherData);
+      
+      await axios.post('http://127.0.0.1:8000/share', payload);
+      // TODO: use better alert dialogs
+      // alert(`Weather report sent to ${contactValue} via ${contactMethod}`);
       setIsShareModalOpen(false);
       setContactValue('');
     } catch (err) {
-      alert('Failed to share weather report. Please try again.');
+      console.error('Failed to share weather report:', err);
+// TODO: use better alert dialogs
+      // alert('Failed to share weather report. Please try again.');
     } finally {
       setShareLoading(false);
     }
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: { preventDefault: () => void; }) => {
     e.preventDefault();
-    // Add your search logic here
+    setCitiesLoaded(false);
+    // useEffect(() => {
+      
+      getCity()
+    // }, []);
+
+
   };
+  const constructRequestPayload = (selectedType: string, selectedWeather: any, contactValue: string) => ({
+    type: selectedType,
+    value: contactValue,
+    weather: {
+      name: selectedWeather.name,
+      temperature: selectedWeather.temp,
+      condition: selectedWeather.condition,
+      humidity: selectedWeather.humidity,
+      wind_speed: selectedWeather.windSpeed,
+      sunrise: selectedWeather.sunrise,
+      sunset: selectedWeather.sunset
+    }
+  });
 
   const getCurrentLocation = () => {
     // Add your location logic here
+  };
+  const handleShareClick = (data) => {
+    console.log("Sharing weather data:", data);
+    setWeatherData(data);
+    setIsShareModalOpen(true);
   };
 
   const ShareModal = () => (
@@ -144,8 +166,14 @@ const WeatherApp = () => {
     )
   );
 
-  const WeatherCard = ({ data, isStatic }) => (
-    <div className="w-full">
+  const WeatherCard = ({ data, isStatic,onShare  }) => {
+    const handleClick = () => {
+      if (!isStatic) {
+        onShare(data);
+      }
+    };
+
+    return (<div className="w-full">
       <div className={`rounded-lg overflow-hidden ${
         isDarkMode ? 
         'bg-gray-800 border-gray-700 text-white' : 
@@ -154,12 +182,14 @@ const WeatherApp = () => {
         <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-sky-100'}`}>
           <div className={`flex items-center justify-between ${isDarkMode ? 'text-white' : 'text-sky-800'}`}>
             <div className="flex items-center gap-2">
-              <Sun className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} />
+              {/* <Sun className={`h-6 w-6 ${isDarkMode ? 'text-yellow-300' : 'text-yellow-400'}`} /> */}
+              {conditionIcon.find(icon => data.condition.toLowerCase().includes(icon.name))?.icon}
               <h3 className="text-lg font-bold">{data.city || data.name}</h3>
             </div>
             {!isStatic && (
               <button
-                onClick={() => setIsShareModalOpen(true)}
+                // onClick={() => setIsShareModalOpen(true)}
+                onClick={handleClick}
                 className={`p-2 rounded-md ${
                   isDarkMode ? 
                   'hover:bg-gray-700 text-white' : 
@@ -175,7 +205,7 @@ const WeatherApp = () => {
           <div className="grid grid-cols-2 gap-4">
             {['Temperature', 'Humidity', 'Wind Speed', 'Condition'].map((metric, index) => (
               <div
-                key={metric}
+                key={index}
                 className={`text-center p-3 rounded-lg ${
                   isDarkMode ? 'bg-gray-700' : 'bg-sky-100'
                 }`}
@@ -194,9 +224,74 @@ const WeatherApp = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
-
+    </div>);
+  };
+  const getCities = () => {
+    const cityUrl = 'http://localhost:8000/';
+  
+    return axios.get(cityUrl)
+      .then(function (response: any) {
+        const data = response.data;
+        
+        
+        const transformedData = data.map(city => ({
+          name: city.name,
+          temp: city.temperature,
+          condition: city.condition,
+          humidity: city.humidity,
+          windSpeed: city.wind_speed,
+          sunrise: city.sunrise,
+          sunset: city.sunset
+        }));
+        console.log(transformedData);
+  
+        setFetchedData(prevData => [...prevData, ...transformedData]);
+      })
+      .catch(function (error: any) {
+        console.error(error);
+      })
+      .finally(() => {
+        setCitiesLoaded(true);
+      });
+  };
+  const getCity = () => {
+    const cityUrl = 'http://localhost:8000/city' + searchCity;
+    setFetchedData([]);
+    const city = [];
+    return axios.get(cityUrl)
+      .then(function (response: any) {
+        const data = response.data;
+        
+        
+        const transformedData = data.map(city => ({
+          name: city.name,
+          temp: city.temperature,
+          condition: city.condition,
+          humidity: city.humidity,
+          windSpeed: city.wind_speed,
+          sunrise: city.sunrise,
+          sunset: city.sunset
+        }));
+  
+        setFetchedData(prevData => [...prevData, ...transformedData]);
+      })
+      .catch(function (error: any) {
+        console.error(error);
+      })
+      .finally(() => {
+        setCitiesLoaded(true);
+      });
+  };
+  useEffect(() => {
+    // const loadCities = async () => {
+    //   const promises = Array.from({ length: 1 }).map(() => getCities());
+    //   await Promise.all(promises);
+    // };
+  
+    // loadCities();
+    getCities()
+  }, []);
+  
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       isDarkMode ? 
@@ -278,9 +373,7 @@ const WeatherApp = () => {
         )}
 
         <div className="space-y-6">
-          {weatherData && weatherData.map((data, index) => (
-            <WeatherCard key={index} data={data} />
-          ))}
+          {weatherData && <WeatherCard data={weatherData} isStatic={false}  onShare={handleShareClick}/>}
 
           <div>
             <h2 className={`text-2xl font-semibold mb-4 flex items-center gap-2 ${
@@ -292,13 +385,13 @@ const WeatherApp = () => {
               Major Cities
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {staticCities.map((city) => (
-                <WeatherCard
-                  key={city.name}
-                  data={city}
-                  isStatic
-                />
-              ))}
+            {citiesLoaded ? (
+  fetchedData.map((city) => (
+    <WeatherCard data={city} isStatic={false}  onShare={handleShareClick}/>
+  ))
+) : (
+  <div>Loading cities...</div>
+)}
             </div>
           </div>
         </div>
