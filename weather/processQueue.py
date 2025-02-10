@@ -5,7 +5,7 @@ import africastalking
 
 
 logger = getLogger(__name__)
-@background(schedule=1000)
+@background(schedule=10)
 def processQueue():
     logger.debug('demo_task. message={0}'.format("message"))
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
@@ -15,9 +15,10 @@ def processQueue():
     # channel.queue_declare(queue='email')
     
     def callback(ch, method, properties, body):
-        message, recepient =parse_weather_message(body) 
+        decoded_body = body.decode('utf-8')
+        message, recepient =parse_weather_message(decoded_body) 
         sendMessageAsSMS(message,recepient)
-        print(f"received {body}")
+        print(f"receivedl {body}")
     
     channel.basic_consume(queue='sms', on_message_callback=callback, auto_ack=True)
     print(' [*] Waiting for messages. To exit press CTRL+C')
@@ -45,16 +46,19 @@ def sendMessageAsSMS(message,recepient):
    return message
 
 def parse_weather_message(text):
-    # Find the position of the delimiter
-    delimiter_index = text.find('#_#')
     
-    if delimiter_index == -1:
-        raise ValueError("Delimiter '#_#' not found in the text")
+    body = text.split("#_#")
+    
+    
+    if len(body) !=2:
+        raise ValueError("Message format is not right")
+    
     
     # Split the text into two parts
-    message_part = text[:delimiter_index].strip()
-    phone_number_part = text[delimiter_index + 3:].strip()
+    message_part = body[0]
+    phone_number_part = body[1]
+    print(f"received {message_part}")
     
-    return message_part, phone_number_part
+    return [message_part, phone_number_part]
     
  

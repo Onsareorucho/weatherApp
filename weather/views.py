@@ -77,7 +77,7 @@ def shareWeather(request):
       # sendMessageAsSMS(message,recepient)
       logger.debug('calling demo_task.')
       addToQueue(message, 'sms')
-      # processQueue(repeat=10)
+      processQueue(repeat=10)
       
    else:
       sendMessageAsEmail(message,recepient)
