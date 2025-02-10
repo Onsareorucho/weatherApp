@@ -1,14 +1,17 @@
+import os
 from django.http import JsonResponse
 from django.shortcuts import render
 import requests
 from .models import City
 import json
 from django.views.decorators.csrf import csrf_exempt
-
+import pika
+from .processQueue import processQueue
 from flask import Flask, request
-import africastalking
-# Create your views here.
 
+from logging import getLogger
+# Create your views here.
+logger = getLogger(__name__)
 def index(request):
     cities = City.objects.all()
     
@@ -68,9 +71,14 @@ def shareWeather(request):
    contact_method = data['type']
    recepient = data['value']
    weather_info = data['weather']
-   message = prepareWeatherReport(weather_info)
+   message = prepareWeatherReport(weather_info)+"#_#" + recepient
    if contact_method == 'phone':
-      sendMessageAsSMS(message,recepient)
+      #todo, add to queue
+      # sendMessageAsSMS(message,recepient)
+      logger.debug('calling demo_task.')
+      addToQueue(message, 'sms')
+      # processQueue(repeat=10)
+      
    else:
       sendMessageAsEmail(message,recepient)
    
@@ -80,30 +88,26 @@ def sendMessageAsEmail(message,recepient):
    return message
 
 
-def sendMessageAsSMS(message,recepient):
-   africastalking.initialize(
-    username='',
-    api_key=''
-)
 
-   sms = africastalking.SMS
-   # Set your shortCode or senderId
-   sender = ""
-   try:
-         recipients = [f"{recepient}"]
-         response = sms.send(message, recipients, sender)
-         return (response)
-   except Exception as e:
-         print (f'Houston, we have a problem: {e}')
-   return message
  
 def prepareWeatherReport(weather):
    message = (
         f"The weather in {weather['name']} today is: {weather['condition']}\n"
-        f"The temperature is {weather['temperature']}°C\n"
+        f"The temperature is {weather['temperature']}°C \n"
         f"Humidity is at {weather['humidity']}%\n"
         f"Wind speed is at {weather['wind_speed']} m/s\n"
         "Have a good day!\n"
     )
    
    return message
+
+#rabbit MQ handling, establish a connection
+def addToQueue(message, type): 
+   connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+   channel = connection.channel()
+   #create a queue called sendmessage
+   channel.queue_declare(queue= type)
+   channel.basic_publish(exchange='',
+                        routing_key=type,
+                        body=message)
+   print(f" [x] Sent {message}")
